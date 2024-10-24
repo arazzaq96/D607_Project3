@@ -80,10 +80,17 @@ print(ex3)
 
 
 ### DuckDB to Dataframe
-Use the _tbl_ function to access the DuckDB table as a Dataframe
+Using _dbGetQuery_ in the examples above returns a dataframe. Alternately, use the _tbl_ function to access the DuckDB table as a Dataframe. 
 
 ```{r to-df }
-# to df
+# transform from sql query
+alter_ex3 <- ex3 |>
+  mutate(company_2 = substr(company, 2, 5))
+
+glimpse(alter_ex3)
+
+
+# use tbl to get raw table
 jobs <- tbl(con, "jobs")
 skills <- tbl(con, "skills")
 job_skills <- tbl(con, "job_skills")
@@ -95,4 +102,5 @@ glimpse(jobs)
 
 ```
 
+More info [here](https://duckdb.org/docs/api/r) 
 
