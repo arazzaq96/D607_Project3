@@ -8,35 +8,95 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(dplyr)
 library(dbplyr)
 library(tidyr)
 library(tibble)
 library(rvest)
 library(rlist)
+library(readr)
 library(XML)
 library(xml2)
 library(jsonlite)
 library(arrow)
 library(stringr)
+
 ```
 
 ## Reading original dataset
 
 ```{r read-csv}
 
-orig_file <- read_csv("glassdoor_jobs.csv") |>
-  mutate(job_id = row_number()) |>
-  rename_with(~ tolower(gsub(" ", "_", .x, fixed = TRUE))) |>
-  relocate(job_id, .before = "job_title") 
+# load main job listing file
+# source: https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills
+orig_job_postings <- read_csv("indeed/job_postings.csv") |>
+  mutate(
+    job_id = str_extract(job_link, "\\-[^\\-]*$"),
+    job_id = substr(job_id, 2, nchar(job_id))
+  ) |>
+  relocate(job_id, .before = "job_link") 
 
-company <- subset(orig_file, select = c(company_name, location, size, founded, type_of_ownership, industry, sector, revenue))
+# pull in job descriptions
+orig_job_summary <- read_csv("indeed/job_summary.csv") |>
+  mutate(
+    job_id = str_extract(job_link, "\\-[^\\-]*$"),
+    job_id = substr(job_id, 2, nchar(job_id))
+  ) |>
+  relocate(job_id, .before = "job_link") |>
+  subset(select = -c(job_link))
 
-job <- subset(orig_file, select = c(job_id, job_title, salary_estimate, job_description))
-# no skills column, would need to extract from description column
-skills <- subset(orig_file, select = c(job_id, job_description))
+# add job description and subset
+job_postings <- orig_job_postings |> 
+  left_join(orig_job_summary, join_by(job_id == job_id)) |>
+  subset(select = c(job_id, job_title, job_summary, job_location, search_position, job_level, job_type, company))
 
-head(orig_file)
-  
+# subset companies and add col id  
+companies <- subset(orig_job_postings, select = c(company)) |>
+  distinct(company) |>
+  mutate(company_id = row_number()) |>
+  relocate(company_id, .before = "company") 
+
+job_postings <- job_postings |>
+  left_join(companies, join_by(company == company)) |>
+  subset(select = -c(company))
+
+
+job_skills_import <- read_csv("indeed/job_skills.csv") |>
+  mutate(
+    job_id = str_extract(job_link, "\\-[^\\-]*$"),
+    job_id = substr(job_id, 2, nchar(job_id)),
+  ) |>
+  relocate(job_id, .before = "job_link") |>
+  subset(select = c(job_id, job_skills))
+
+
+# create joiner table
+job_skills_key <- job_skills_import |>
+  separate_longer_delim(cols = c(job_skills), delim="," )
+
+
+# make distinct list of artists and give them their own id
+job_skills_df <- job_skills_key |>
+  distinct(job_skills) |>
+  mutate(skill_id = row_number()) |>
+  relocate(skill_id, .before = job_skills)
+
+# join artist list to keys to bring unique artist idea 
+job_skills_key <- job_skills_key |>
+  left_join(job_skills_df, join_by(job_skills == job_skills)) |>
+  subset(select=-c(job_skills))
+
+# write parquet files
+write_parquet(job_postings, "job_postings.parquet")
+write_parquet(companies, "companies.parquet")
+write_parquet(job_skills_df, "job_skills.parquet")
+write_parquet(job_skills_key, "job_skills_key.parquet")
+
+write.csv(job_postings, "job_postings.csv")
+write.csv(companies, "companies.csv")
+write.csv(job_skills_df, "job_skills_df.csv")
+write.csv(job_skills_key, "job_skills_key.csv")
+
 ```
 
 
