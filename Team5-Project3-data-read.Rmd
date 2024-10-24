@@ -1,0 +1,42 @@
+---
+title: "Team 5 - Project 3"
+author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
+date: "2024-10-14"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(dbplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(arrow)
+library(duckdb)
+
+```
+
+## Reading original dataset
+
+```{r read-files}
+
+con <- dbConnect(duckdb::duckdb())
+
+# make an in-memory db and store the connection in a variable
+duckdb_register(con, "jobs", read_parquet('jobs.parquet'))
+duckdb_register(con, "skills", read_parquet('skills.parquet'))
+duckdb_register(con, "job_skills", read_parquet('job_skills.parquet'))
+duckdb_register(con, "companies",  read_parquet('companies.parquet'))
+
+# read as df
+jobs <- tbl(con, "jobs")
+skills <- tbl(con, "skills")
+job_skills <- tbl(con, "job_skills")
+companies <- tbl(con, "companies")
+
+head(jobs)
+```
+
+
