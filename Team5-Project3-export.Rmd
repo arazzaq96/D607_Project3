@@ -68,25 +68,24 @@ job_skills_import <- read_csv("indeed/job_skills.csv") |>
   ) |>
   relocate(job_id, .before = "job_link") |>
   subset(select = c(job_id, job_skills)) |>
-  rename(job_name = job_skills)
+  rename(skill_name = job_skills)
   
-
 
 # create joiner table
 job_skills_key <- job_skills_import |>
-  separate_longer_delim(cols = c(job_name), delim="," )
+  separate_longer_delim(cols = c(skill_name), delim="," )
 
 
 # make distinct list of artists and give them their own id
 job_skills_df <- job_skills_key |>
-  distinct(job_name) |>
+  distinct(skill_name) |>
   mutate(skill_id = row_number()) |>
-  relocate(skill_id, .before = job_name)
+  relocate(skill_id, .before = skill_name)
 
 # join artist list to keys to bring unique artist idea 
 job_skills_key <- job_skills_key |>
-  left_join(job_skills_df, join_by(job_name == job_name)) |>
-  subset(select=-c(job_name))
+  left_join(job_skills_df, join_by(skill_name == skill_name)) |>
+  subset(select=-c(skill_name))
 
 # write parquet files
 write_parquet(job_postings, "datasets/jobs.parquet")
