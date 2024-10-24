@@ -1,0 +1,98 @@
+---
+title: "Team 5 - Project 3"
+author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
+date: "2024-10-14"
+output: html_document
+---
+
+# Using DuckDB
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(dbplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(arrow)
+library(duckdb)
+
+```
+
+## Initializing DuckDB
+
+This bit just initializes DuckDB. First create a connection to a new DuckDB then register your files. _duckdb_register_ basically just converts your file into a database table.
+
+Note: I may try to make a more programatic call later on. 
+
+```{r inti_duck_db}
+# initialize a new instance of DuckDB 
+# and create a connection
+con <- dbConnect(duckdb::duckdb())
+
+# make an in-memory db and store the connection in a variable
+duckdb_register(con, "jobs", read_parquet('datasets/jobs.parquet'))
+duckdb_register(con, "skills", read_parquet('datasets/skills.parquet'))
+duckdb_register(con, "job_skills", read_parquet('datasets/job_skills.parquet'))
+
+```
+### SQL example
+
+You can use SQL to query tables. 
+
+
+```{r sql-ex}
+
+# grouping example using one table
+ex1 <- dbGetQuery(con, "SELECT search_position, COUNT(*) AS count_search_position 
+                  FROM jobs WHERE job_location = 'Austin, TX' 
+                  GROUP BY search_position 
+                  ORDER BY count_search_position 
+                  DESC LIMIT 10")
+print(ex1)
+
+
+# join example
+ex2 <- dbGetQuery(con,"SELECT job_title, skill_name
+                  FROM jobs AS j
+                  LEFT JOIN job_skills AS x
+                    ON x.job_id = j.job_id 
+                  LEFT JOIN skills AS s 
+                    ON s.skill_id = x.skill_id 
+                  LIMIT 10")
+print(ex2)
+
+```
+### Mixing File Types
+You can also mix-and-match file types. Here I am registering a CSV file for the companies tables and joining via SQL to the jobs table.
+
+```{r mix-n-match}
+duckdb_register(con, "companies",  read_csv('datasets/companies.csv'))
+
+ex3 <- dbGetQuery(con,"SELECT job_title, company
+                  FROM jobs AS j
+                  LEFT JOIN companies AS c
+                    ON c.company_id = j.company_id
+                  LIMIT 10")
+print(ex3)                
+```
+
+
+### DuckDB to Dataframe
+Use the _tbl_ function to access the DuckDB table as a Dataframe
+
+```{r to-df }
+# to df
+jobs <- tbl(con, "jobs")
+skills <- tbl(con, "skills")
+job_skills <- tbl(con, "job_skills")
+companies <- tbl(con, "companies")
+
+jobs <- jobs |>
+  mutate(test = 'Hi Team')
+glimpse(jobs)
+
+```
+
+
