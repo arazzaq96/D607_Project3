@@ -1,0 +1,42 @@
+---
+title: "Team 5 - Project 3"
+author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
+date: "2024-10-14"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dbplyr)
+library(tidyr)
+library(tibble)
+library(rvest)
+library(rlist)
+library(XML)
+library(xml2)
+library(jsonlite)
+library(arrow)
+library(stringr)
+```
+
+## Reading original dataset
+
+```{r read-csv}
+
+orig_file <- read_csv("glassdoor_jobs.csv") |>
+  mutate(job_id = row_number()) |>
+  rename_with(~ tolower(gsub(" ", "_", .x, fixed = TRUE))) |>
+  relocate(job_id, .before = "job_title") 
+
+company <- subset(orig_file, select = c(company_name, location, size, founded, type_of_ownership, industry, sector, revenue))
+
+job <- subset(orig_file, select = c(job_id, job_title, salary_estimate, job_description))
+# no skills column, would need to extract from description column
+skills <- subset(orig_file, select = c(job_id, job_description))
+
+head(orig_file)
+  
+```
+
+
