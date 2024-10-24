@@ -20,7 +20,7 @@ library(xml2)
 library(jsonlite)
 library(arrow)
 library(stringr)
-
+library(digest)
 ```
 
 ## Reading original dataset
@@ -31,16 +31,30 @@ library(stringr)
 # source: https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills
 orig_job_postings <- read_csv("indeed/job_postings.csv") |>
   mutate(
-    job_id = str_extract(job_link, "\\-[^\\-]*$"),
-    job_id = substr(job_id, 2, nchar(job_id))
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
+  ) |>
+  relocate(job_id, .before = "job_link") 
+
+head(orig_job_postings$job_id, n=2)
+```
+
+```{r test-hash}
+
+  # load main job listing file
+# source: https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills
+orig_job_postings <- read_csv("indeed/job_postings.csv") |>
+  mutate(
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
   ) |>
   relocate(job_id, .before = "job_link") 
 
 # pull in job descriptions
 orig_job_summary <- read_csv("indeed/job_summary.csv") |>
   mutate(
-    job_id = str_extract(job_link, "\\-[^\\-]*$"),
-    job_id = substr(job_id, 2, nchar(job_id))
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
   ) |>
   relocate(job_id, .before = "job_link") |>
   subset(select = -c(job_link))
@@ -63,8 +77,8 @@ job_postings <- job_postings |>
 
 job_skills_import <- read_csv("indeed/job_skills.csv") |>
   mutate(
-    job_id = str_extract(job_link, "\\-[^\\-]*$"),
-    job_id = substr(job_id, 2, nchar(job_id)),
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
   ) |>
   relocate(job_id, .before = "job_link") |>
   subset(select = c(job_id, job_skills)) |>
