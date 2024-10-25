@@ -78,7 +78,6 @@ ex3 <- dbGetQuery(con,"SELECT job_title, company
 print(ex3)                
 ```
 
-
 ### DuckDB to Dataframe
 Using _dbGetQuery_ in the examples above returns a dataframe. Alternately, use the _tbl_ function to access the DuckDB table as a Dataframe. 
 
@@ -101,6 +100,35 @@ jobs <- jobs |>
 glimpse(jobs)
 
 ```
+
+
+## Full Join 
+This is an exammple showing all four tables being joined.
+
+```{r}
+
+# 
+jobs_df <- dbGetQuery(con,"WITH skills_by_id AS (
+                    SELECT job_id,
+                      STRING_AGG (skill_name, ',' ) AS skills
+                    FROM job_skills AS x
+                    LEFT JOIN skills AS s 
+                      ON s.skill_id = x.skill_id 
+                    GROUP BY job_id
+                  )
+
+                  SELECT j.job_id, job_title, job_summary, job_location, search_position, job_level, job_type, c.company, s.skills
+                  FROM jobs AS j
+                  LEFT JOIN skills_by_id AS s
+                      ON s.job_id = j.job_id 
+                  LEFT JOIN companies AS c
+                    ON c.company_id = j.company_id
+            ")
+
+head(jobs_df)
+
+```
+
 
 More info [here](https://duckdb.org/docs/api/r) 
 

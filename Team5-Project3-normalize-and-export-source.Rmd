@@ -78,43 +78,67 @@ As a final step, I use __left_join__ to join my "skills" dataframe to the "job_s
 1. _job_id_ which will serve as a foreign key to join with my "jobs" dataframe or SQL table, and
 2. _skill_id_ which will serve as a foreign key to join with my "skills" table or SQL table
 
+
 ```{r create-joiner-table}
 
 # create joiner table
-job_skills_df <- read_csv("source_files/job_skills.csv") |>
+job_skills_dirty <- read_csv("source_files/job_skills.csv") |>
   convert_key() |>
   subset(select = c(job_id, job_skills)) |>
-  rename(skill_name = job_skills)  |>
-  separate_longer_delim(cols = c(skill_name), delim="," )
+  rename(skill_name = job_skills)
 
-# make distinct list of artists and give them their own id
-skills_df <- job_skills_df |>
+# make distinct list of unique skills and give them their own id
+skills_delimned <- job_skills_dirty |>
   distinct(skill_name) |>
   mutate(skill_id = row_number()) |>
   relocate(skill_id, .before = skill_name)
 
 # update joiner to bring unique artist idea 
-job_skills_df <- job_skills_df |>
-  left_join(skills_df, join_by(skill_name == skill_name)) |>
+job_skills_delimned <- job_skills_dirty |>
+  left_join(skills_delimned, join_by(skill_name == skill_name)) |>
+  subset(select=-c(skill_name))
+```
+
+This one is the same as above but uses distint to create individual rows of one unique skill per row.
+
+```{r create-joiner-table-distinct}
+
+# create joiner table
+job_skills_distinct <- job_skills_dirty  |>
+  separate_longer_delim(cols = c(skill_name), delim="," )
+
+# make distinct list of unique skills and give them their own id
+skills_distinct <- job_skills_distinct |>
+  distinct(skill_name) |>
+  mutate(skill_id = row_number()) |>
+  relocate(skill_id, .before = skill_name)
+
+# update joiner to bring unique artist idea 
+job_skills_distinct <- job_skills_distinct |>
+  left_join(skills_distinct, join_by(skill_name == skill_name)) |>
   subset(select=-c(skill_name))
 ```
 
 ### Export Files
 
-This next section writes the data frames as Parquet files. Since Parquet is binary format, I am also exporting the dataframes to .CSV to be able to examine the outputs.
+This next section writes the data frames as Parquet files. Since Parquet is binary format, I am also exporting the dataframes to .CSV to be able to examine the outputs. 
 
 ```{r export-files}
 # write parquet files
 write_parquet(jobs_df, "datasets/jobs.parquet")
 write_parquet(companies_df, "datasets/companies.parquet")
-write_parquet(skills_df, "datasets/skills.parquet")
-write_parquet(job_skills_df, "datasets/job_skills.parquet")
+write_parquet(skills_delimned, "datasets/skills_delimned.parquet")
+write_parquet(job_skills_delimned, "datasets/job_skills_delimned.parquet")
+write_parquet(skills_distinct, "datasets/skills.parquet")
+write_parquet(job_skills_distinct, "datasets/job_skills.parquet")
 
 # write CSV files 
 write.csv(jobs_df, "datasets/jobs.csv", row.names=FALSE)
 write.csv(companies_df, "datasets/companies.csv", row.names=FALSE)
-write.csv(skills_df, "datasets/skills.csv", row.names=FALSE)
-write.csv(job_skills_df, "datasets/job_skills.csv", row.names=FALSE)
+write.csv(skills_delimned, "datasets/skills_delimned.csv", row.names=FALSE)
+write.csv(job_skills_delimned, "datasets/job_skills_delimned.csv", row.names=FALSE)
+write.csv(skills_distinct, "datasets/skills.csv", row.names=FALSE)
+write.csv(job_skills_distinct, "datasets/job_skills.csv", row.names=FALSE)
 
 ```
 

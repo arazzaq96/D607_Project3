@@ -25,18 +25,38 @@ library(duckdb)
 con <- dbConnect(duckdb::duckdb())
 
 # make an in-memory db and store the connection in a variable
-duckdb_register(con, "jobs", read_parquet('jobs.parquet'))
-duckdb_register(con, "skills", read_parquet('skills.parquet'))
-duckdb_register(con, "job_skills", read_parquet('job_skills.parquet'))
-duckdb_register(con, "companies",  read_parquet('companies.parquet'))
+duckdb_register(con, "jobs", read_parquet('datasets/jobs.parquet'))
+duckdb_register(con, "skills", read_parquet('datasets/skills_delimned.parquet'))
+duckdb_register(con, "job_skills", read_parquet('datasets/job_skills_delimned.parquet'))
+duckdb_register(con, "companies",  read_parquet('datasets/companies.parquet'))
 
 # read as df
-jobs <- tbl(con, "jobs")
-skills <- tbl(con, "skills")
-job_skills <- tbl(con, "job_skills")
-companies <- tbl(con, "companies")
+jobs_table <- tbl(con, "jobs")
+skills_table <- tbl(con, "skills")
+job_skills_table <- tbl(con, "job_skills")
+companies_table <- tbl(con, "companies")
 
-head(jobs)
+head(jobs_table)
+
+# Joined dataframe
+jobs_df <- dbGetQuery(con,"WITH skills_by_id AS (
+                    SELECT job_id,
+                      STRING_AGG (skill_name, ',' ) AS skills
+                    FROM job_skills AS x
+                    LEFT JOIN skills AS s 
+                      ON s.skill_id = x.skill_id 
+                    GROUP BY job_id
+                  )
+
+                  SELECT j.*, c.company, s.skills
+                  FROM jobs AS j
+                  LEFT JOIN skills_by_id AS s
+                      ON s.job_id = j.job_id 
+                  LEFT JOIN companies AS c
+                    ON c.company_id = j.company_id
+            ")
+
+head(jobs_df)
 ```
 
 
