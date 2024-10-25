@@ -43,7 +43,7 @@ skills_df <- tbl(con, "skills")
 job_skills_df <- tbl(con, "job_skills")
 companies_df <- tbl(con, "companies")
 
-head(jobs_table)
+head(jobs_df)
 
 # Joined dataframe
 full_df <- dbGetQuery(con,"WITH skills_by_id AS (
@@ -97,6 +97,8 @@ head(full_df)
 
 
 # Assuming 'full_df' contains job postings and skill information
+
+#### JOSE: Note that this is where it breaks. Ariba was working with a version that had one skill per row in a column called "skill_name." I reverted it back to a comma_delim single colum called "skills" that looks like this "Machine Learning, Programming, Python, Scala, Java, Data Engineering, Distributed Computi". You will need to break this column back up into rows and give the name she gave "skill_name" to get it to work from here on.
 
 # 1. Count the frequency of each skill
 skill_counts <- full_df %>%
