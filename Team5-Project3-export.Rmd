@@ -29,7 +29,7 @@ library(digest)
 
 # load main job listing file
 # source: https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills
-orig_job_postings <- read_csv("indeed/job_postings.csv") |>
+orig_job_postings <- read_csv("/Users/aribarazzaq/Documents/GitHub/D607_Project3/indeed/job_postings.csv") |>
   mutate(
     job_id = str_extract(job_link, "\\/[^\\/]*$"),
     job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
@@ -111,6 +111,115 @@ write.csv(job_postings, "datasets/jobs.csv", row.names=FALSE)
 write.csv(companies, "datasets/companies.csv", row.names=FALSE)
 write.csv(job_skills_df, "datasets/skills.csv", row.names=FALSE)
 write.csv(job_skills_key, "datasets/job_skills.csv", row.names=FALSE)
+
+```
+
+
+**Data Tidying**
+
+
+
+
+```{r}
+# Rename the data frame to jobs_df
+jobs_df <- job_postings  # Or replace with the correct data frame name if it's different
+
+# Rename job_skills_df to skills_df if needed
+skills_df <- job_skills_df
+
+
+
+```
+```{r}
+# Check existence of all necessary data frames
+all_exist <- all(exists("jobs_df"), exists("job_skills_df"), exists("companies"), exists("skills_df"))
+if (!all_exist) {
+  stop("One or more data frames are missing!")
+}
+
+```
+```{r}
+# Merge job_postings (jobs_df) with job_skills_key on 'job_id'
+jobs_skills_df <- jobs_df %>%
+  inner_join(job_skills_key, by = "job_id")
+
+# Merge with skills_df to add skill names
+jobs_skills_df <- jobs_skills_df %>%
+  inner_join(skills_df, by = "skill_id")
+
+# Merge with companies to add company information
+full_df <- jobs_skills_df %>%
+  inner_join(companies, by = "company_id")
+
+```
+```{r}
+# Display the first few rows of the final data frame
+head(full_df)
+
+```
+```{r}
+
+# 1. Standardize Column Names
+full_df <- full_df %>%
+  rename_all(~str_to_lower(.)) %>%    # Convert all column names to lowercase
+  rename_all(~str_replace_all(., " ", "_")) # Replace spaces with underscores
+
+# 2. Remove Duplicates
+full_df <- full_df %>%
+  distinct()  # Keep only unique rows
+
+# 3. Handle Missing Values
+# Replace NA values with 'Unknown' in character columns
+full_df <- full_df %>%
+  mutate(across(where(is.character), ~replace_na(., "Unknown")))
+
+# Display the cleaned data frame
+head(full_df)
+
+```
+
+
+```{r}
+
+
+# Assuming 'full_df' contains job postings and skill information
+
+# 1. Count the frequency of each skill
+skill_counts <- full_df %>%
+  count(skill_name, sort = TRUE) %>%  # Count occurrences of each skill and sort by frequency
+  rename(frequency = n)  # Rename the count column to 'frequency'
+
+# 2. Display the top skills
+head(skill_counts, 10)  # Show the top 10 skills by frequency
+
+```
+
+```{r}
+library(ggplot2)
+
+# Plot the top 10 skills
+ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = frequency)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 10 Skills in Data Science Job Postings",
+       x = "Skill",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+
+
+# List of text columns to normalize
+text_columns <- c("job_title", "job_summary", "job_location", "search_position", "company")
+
+# Apply normalization to each text column
+full_df <- full_df %>%
+  mutate(across(all_of(text_columns), ~ str_trim(tolower(.))))
+
+# Display the first few rows of the updated dataset
+head(full_df)
 
 ```
 
