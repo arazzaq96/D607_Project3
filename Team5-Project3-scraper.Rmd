@@ -1,0 +1,172 @@
+---
+title: "D607-Project3-scraper"
+author: "Marco Castro"
+date: "2024-10-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rvest)
+library(stringr)
+library(arrow)
+```
+
+## Overview
+
+This script scrapes the [reed.co.uk](https://reed.co.uk) website, a UK-based job listing site similar to Indeed. It was adapted from a script written by [J. Humms] ("https://jhumms.medium.com/how-to-scrape-job-information-with-r-b385d7a39550").
+
+```{r init-scraper}
+
+# Read first search 
+reed_data <- read_html("https://www.reed.co.uk/jobs/data-scientist-jobs-in-london?fulltime=True&proximity=50")
+
+# grab html on this page
+reed_data %>% html_text()
+
+# get the number of jobs per page
+job_count <- reed_data %>% 
+  html_element(xpath = '//header[@class="pagination_pagination__heading__hlCzI pagination_pageNumbers__L_ry7 card-header"]')%>% 
+  html_text() %>%
+  strsplit(" ")
+
+# get the number of listings per page  
+num_per_page <- as.numeric(job_count[[1]][3]) - as.numeric(job_count[[1]][1]) + 1
+
+# grab the pagination list items
+pagination <- reed_data %>% 
+  html_elements(xpath = '//a[@class="page-link"]') %>% 
+  html_text() %>%
+  strsplit(" ")
+
+# get the total number of search result pages
+last_page = as.numeric(pagination[length(pagination)]) + 1
+
+```
+
+This section crawls through each search result page and grabs the unique job listing id. This will be used later to crawl the individual job listing page.
+
+```{r crawl-search-result-pages}
+
+# init the page counter
+current_page <- 1
+
+# init the page_ids data frame
+page_ids <- data.frame()
+
+# loop though all pages
+while (current_page < last_page) {
+
+    # This will concatenate the url depending on the page
+    page_url = str_c('https://www.reed.co.uk/jobs/full-time-data-scientist-jobs-in-london?proximity=1000&pageno=', current_page, sep="")
+    page_content = read_html(page_url)
+    
+    # This will get the url
+    page_id <- page_content %>% 
+      html_elements(xpath = '//article[@class="card job-card_jobCard__MkcJD"]') %>% 
+      html_nodes('header') %>% 
+      html_element('a') %>% 
+      html_attr('data-id')
+    
+    # remove all blank elements
+    page_id <- page_id[!is.na(page_id)]
+    
+    # This appends the data together
+    page_ids <- append(page_ids, page_id)
+  
+    # This tells us to go to the next page
+    current_page <- current_page + 1
+}
+
+
+```
+
+This section crawls each individual job listing page, grabs the content and exports as a parquet file.
+
+```{r crawl-job-listing-pages}
+
+# init all_jobs dataframe
+col_names <- c("id", "job_title", "date_posted", "job_desc", "job_location", "job_salary", "job_type", "company", "company_url", "job_skills")
+all_jobs <- data.frame(matrix(ncol=10,nrow=0, dimnames=list(NULL,  col_names)))
+
+for (i in unique(page_ids)) {
+
+  job_listing_page = read_html(str_c('https://www.reed.co.uk/jobs/data-scientist/',i, sep=""))
+  
+  # a helper funtion to grab the html text from a node
+  get_listing_el <- function(el) {
+
+    el_text <- job_listing_page |>
+    html_elements(xpath = el) |>
+    html_text() 
+    
+    # if no node found or empty, fill value to blank char
+    if (identical(el_text, character(0))) {
+      el_text <- ""
+    } else {
+      el_text <- str_trim(el_text, side = "both")
+    }
+    
+    el_text
+  }
+  
+   # get the posted date
+  date_posted <- job_listing_page |>
+    html_element('[itemprop="datePosted"]') |>
+    html_attr("content")
+  
+  # get the job title
+  job_title <- job_listing_page |>
+    html_element("h1") |>
+    html_text() 
+
+  # get the job description
+  job_desc <- get_listing_el('//div[@class="description"]') 
+    
+  # get sthe salery
+  job_salary <- get_listing_el('//span[@data-qa="salaryLbl"]') 
+
+  # get the location
+  job_location <- get_listing_el('//span[@data-qa="localityLbl"]') 
+
+  # get the job_type
+  job_type <- get_listing_el('//span[@data-qa="jobTypeLbl"]') 
+
+  # get the company name
+  company <- job_listing_page |>
+    html_element('[itemprop="hiringOrganization"]') |>
+    html_element('span') |>
+    html_text()
+  
+  # company url -
+  company_url <- job_listing_page |>
+    html_element('[itemprop="hiringOrganization"]') |>
+    html_element('[itemprop="url"]') |>
+    html_attr("content")
+  
+   
+  # Let's get the skilss
+  job_skills <- get_listing_el('//ul[@class="list-unstyled skills-list"]') 
+  
+  # create a temporary row vector
+  temp <- c(i, job_title, date_posted, job_desc, job_location, job_salary, job_type, company, company_url, job_skills)
+  
+  # append row to all_jobs dataframe 
+  all_jobs <- rbind(temp, all_jobs)
+}
+```
+
+Once this job is complete, export the dataframe as a Parquet and CSV file. 
+
+``` {r export-df}
+# reset dataframe column names
+colnames(all_jobs) <- col_names
+
+# export files to parquet and csv
+write_parquet(all_jobs, "datasets/uk-jobs.parquet")
+write.csv(all_jobs, "datasets/uk-jobs.csv", row.names=FALSE)
+```
+
+## Next Steps
+As next steps, we could follow the[ERD](https://miro.com/app/board/uXjVLPb_3f0=/) from our Indeed database to normalize this dataset. This would allow us to merge the two datasets to aggregrate the information accross the two datasets and/or compare differences between US and UK-based top Data Science skills sought by companies this year. Ideally though, this dataset would match the same time-period of our original "control" dataset.
