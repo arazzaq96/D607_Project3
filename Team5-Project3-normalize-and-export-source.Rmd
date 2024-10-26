@@ -1,0 +1,145 @@
+---
+title: "Team 5 : Project 3 - File Exporter"
+author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
+date: "2024-10-14"
+output: html_document
+---
+
+## Overview 
+This file normalizes the original [Indeed dataset](https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills) and exports the four new dataframes into .CSV and Parquet files for use in Team 5's Project 3.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(dbplyr)
+library(tidyr)
+library(tidyverse)
+library(tibble)
+library(rvest)
+library(rlist)
+library(readr)
+library(XML)
+library(xml2)
+library(jsonlite)
+library(arrow)
+library(stringr)
+library(digest)
+```
+
+## Reading the original dataset files
+
+After inspecting the Indeed dataset files, we noticed that while the files did not have an id column, each job listing, job summary, and job skills could be identified by the listings URL (_job_link_ field). Because this field is a bit verbose, we cleaned up this field using a custom function __convert_key__. The __convert_key__ function accepts a dataframe (_df_), then mutates it by dropping the domain name then using the page slug to create a hash using __digest__. This function will be called to create a unique id for each job and will allow us to join tables as necessary.
+
+Next, I began importing the  job summary, job listing, and job skills files one at a time and cleaning their corresponding dataframes with the columns that we idenfied in our database schema represented in our [Entity Relationship Diagram](https://miro.com/app/board/uXjVLPb_3f0=/).
+
+```{r read-csvs}
+
+# function to create a primary key column from the url
+convert_key <- function (df) {
+  df |> mutate(
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
+  ) |>
+  relocate(job_id)
+}
+
+# read in job summary csv
+orig_job_summary <- read_csv("source_files/job_summary.csv") |>
+  convert_key() |>
+  subset(select = -c(job_link))
+
+# read in job postings csv
+orig_job_postings <- read_csv("source_files/job_postings.csv") |>
+  convert_key()
+
+# subset companies and add col id  
+companies_df <- subset(orig_job_postings, select = c(company)) |>
+  distinct(company) |>
+  mutate(company_id = row_number()) |>
+  relocate(company_id, .before = "company") 
+
+# add job description and subset
+jobs_df <- orig_job_postings |> 
+  left_join(orig_job_summary, join_by(job_id == job_id)) |> # add Job Description
+  subset(select = c(job_id, job_title, job_summary, job_location, search_position, job_level, job_type, company)) |>
+  left_join(companies_df, join_by(company == company)) |>   # add Job Company field
+  subset(select = -c(company))
+
+```
+
+### Creating the Skills and Job_Skills Joining Table
+
+In this section, we create a "skills" dataframe and a joiner "job_skills" dataframe. I start by reading in the job skills, transform the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim_ to break up the _job_skills_ field into separate rows, using a comma deliminator. I will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
+
+To create the "skills" dataframe, I first copy the "job_skills" dataframe, use __distint__ to remove the duplicates, than add a row number to use as the _skill_id_ field. This essentially leaves a table of unique skills with their respective Id.
+
+As a final step, I use __left_join__ to join my "skills" dataframe to the "job_skills" dataframe by the _skill_name_ field. Dropping the _skill_name_ leaves two columns: 
+1. _job_id_ which will serve as a foreign key to join with my "jobs" dataframe or SQL table, and
+2. _skill_id_ which will serve as a foreign key to join with my "skills" table or SQL table
+
+
+```{r create-joiner-table}
+
+# create joiner table
+job_skills_dirty <- read_csv("source_files/job_skills.csv") |>
+  convert_key() |>
+  subset(select = c(job_id, job_skills)) |>
+  rename(skill_name = job_skills)
+
+# make distinct list of unique skills and give them their own id
+skills_delimned <- job_skills_dirty |>
+  distinct(skill_name) |>
+  mutate(skill_id = row_number()) |>
+  relocate(skill_id, .before = skill_name)
+
+# update joiner to bring unique artist idea 
+job_skills_delimned <- job_skills_dirty |>
+  left_join(skills_delimned, join_by(skill_name == skill_name)) |>
+  subset(select=-c(skill_name))
+```
+
+This one is the same as above but uses distint to create individual rows of one unique skill per row.
+
+```{r create-joiner-table-distinct}
+
+# create joiner table
+job_skills_distinct <- job_skills_dirty  |>
+  separate_longer_delim(cols = c(skill_name), delim="," )
+
+# make distinct list of unique skills and give them their own id
+skills_distinct <- job_skills_distinct |>
+  distinct(skill_name) |>
+  mutate(skill_id = row_number()) |>
+  relocate(skill_id, .before = skill_name)
+
+# update joiner to bring unique artist idea 
+job_skills_distinct <- job_skills_distinct |>
+  left_join(skills_distinct, join_by(skill_name == skill_name)) |>
+  subset(select=-c(skill_name))
+```
+
+### Export Files
+
+This next section writes the data frames as Parquet files. Since Parquet is binary format, I am also exporting the dataframes to .CSV to be able to examine the outputs. 
+
+```{r export-files}
+# write parquet files
+write_parquet(jobs_df, "datasets/jobs.parquet")
+write_parquet(companies_df, "datasets/companies.parquet")
+write_parquet(skills_delimned, "datasets/skills_delimned.parquet")
+write_parquet(job_skills_delimned, "datasets/job_skills_delimned.parquet")
+write_parquet(skills_distinct, "datasets/skills.parquet")
+write_parquet(job_skills_distinct, "datasets/job_skills.parquet")
+
+# write CSV files 
+write.csv(jobs_df, "datasets/jobs.csv", row.names=FALSE)
+write.csv(companies_df, "datasets/companies.csv", row.names=FALSE)
+write.csv(skills_delimned, "datasets/skills_delimned.csv", row.names=FALSE)
+write.csv(job_skills_delimned, "datasets/job_skills_delimned.csv", row.names=FALSE)
+write.csv(skills_distinct, "datasets/skills.csv", row.names=FALSE)
+write.csv(job_skills_distinct, "datasets/job_skills.csv", row.names=FALSE)
+
+```
+
+
