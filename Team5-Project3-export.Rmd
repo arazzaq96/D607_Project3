@@ -31,12 +31,17 @@ library(ggplot2)
 
 For Project 3, our team was asked to answer the question, _Which are the most valued data science skills?_ To answer this question, we decided to explore the top skills that companies search for in a job candidate. We sourced data from [Indeed](https://indeed.com/), a popular job listing site. We were able to source a [dataset](https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills) featuring over 12,000 US Data Science jobs scraped from Indeed in January 2024<sup>*</sup>.
 
-We began by normalizing the dataset to match our proposed Entity Relationship Diagram (ERD) shown below
-![Entity Relationship Diagram](ERD.png). We have broken out our normalization process int a [separate document](https://github.com/mcastro64/D607_Project3/blob/main/Team5-Project3-normalize-and-export-source.html)  in an attempt to show how we would work directly with an existing relational database.  
+We began by normalizing the dataset to match our proposed Entity Relationship Diagram (ERD) shown below:
+
+![Entity Relationship Diagram](ERD.png). 
+
+We have broken out our normalization process int a [separate document](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-normalize-and-export-source.Rmd) in an attempt to only show how we would work directly with an existing relational database within this file.  
 
 ### Reading the Normalized Dataset
 
-We used [DuckDB](https://duckdb.org/), a popular open-source embeddable database to manage our relational database. We chose DuckDB as way to try working with a different type of database within R, as well as for its portability, though we don't recommend storing sensitive data in a public repository as we have.  After loading the __duckdb__ package, we initialized DuckDB by establishing a connection and importing our pre-normalized database parquet files. Next we used SQL to join the tables into a single dataframe.
+We used [DuckDB](https://duckdb.org/), a popular open-source embeddable database to manage our relational database. We chose DuckDB as way to try working with a different type of database within R and for its portability — though we don't recommend storing sensitive data in a public repository as we have for this exercise. 
+
+After loading the __duckdb__ package, we initialized DuckDB by establishing a connection and importing our pre-normalized database parquet files. Next we used SQL to join the tables into a single dataframe.
 
 
 ```{r init-db-connection}
@@ -208,4 +213,4 @@ print(regional_distribution)
 
 
 
-<small><sup>*</sup> Our team made an attempt to scrape current data from Indeed, but were unable to replicate the procedure. For demonstrative purposes, we did (scrape data](https://github.com/mcastro64/D607_Project3/blob/main/Team5-Project3-scraper.html) from a UK-based jobs engine, which could be used to compare the differences between the two in a version of this future project</small>
+<small><sup>*</sup> Our team made an attempt to scrape current data from Indeed, but were unable to replicate the procedure. For demonstrative purposes, we did (scrape data](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-scraper.Rmd) from a UK-based jobs engine, which could be used to compare the differences between the two in a version of this future project</small>
