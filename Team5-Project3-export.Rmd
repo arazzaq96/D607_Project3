@@ -139,7 +139,6 @@ head(full_df)
 ```
 
 ##This is some basic statistics that can be used in the project
-
 ```{r Some-statistics}
 
 library(dplyr)
@@ -207,4 +206,4 @@ missing_values <- full_df %>%
 print("Missing Values in Each Column:")
 print(missing_values)
 
-
+```
