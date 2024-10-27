@@ -95,19 +95,18 @@ head(full_df)
 
 ```{r}
 
-
 # Assuming 'full_df' contains job postings and skill information
 
-#### JOSE: Note that this is where it breaks. Ariba was working with a version that had one skill per row in a column called "skill_name." I reverted it back to a comma_delim single colum called "skills" that looks like this "Machine Learning, Programming, Python, Scala, Java, Data Engineering, Distributed Computi". You will need to break this column back up into rows and give the name she gave "skill_name" to get it to work from here on.
-
-# 1. Count the frequency of each skill
+# 1. Separate the skills column back into individual rows, renaming it to "skill_name":
 skill_counts <- full_df %>%
-  count(skill_name, sort = TRUE) %>%  # Count occurrences of each skill and sort by frequency
-  rename(frequency = n)  # Rename the count column to 'frequency'
+  separate_rows(skills, sep = ",") %>%    # Split skills by commas into individual rows
+  rename(skill_name = skills) %>%         # Rename the column to "skill_name"
+  mutate(skill_name = str_trim(skill_name)) %>%  # Remove extra spaces around skill names
+  count(skill_name, sort = TRUE) %>%      # Count occurrences of each skill and sort by frequency
+  rename(frequency = n)                   # Rename count column to 'frequency'
 
 # 2. Display the top skills
 head(skill_counts, 10)  # Show the top 10 skills by frequency
-
 ```
 
 ```{r}
@@ -138,5 +137,74 @@ full_df <- full_df %>%
 head(full_df)
 
 ```
+
+##This is some basic statistics that can be used in the project
+
+```{r Some-statistics}
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+# Step 1: Load full_df and collect data for in-memory processing
+full_df <- full_df %>%
+  collect()  # If full_df is still lazy, convert it to an in-memory data frame
+
+# Step 2: Basic summary statistics for numeric columns
+numeric_summary <- full_df %>%
+  summarise(across(where(is.numeric), list(mean = mean, sd = sd, min = min, max = max), na.rm = TRUE))
+
+print("Numeric Summary:")
+print(numeric_summary)
+
+# Step 3: Counts of unique values in each character column
+unique_counts <- full_df %>%
+  summarise(across(where(is.character), ~n_distinct(.)))
+
+print("Unique Counts in Character Columns:")
+print(unique_counts)
+
+# Step 4: Distribution of job titles and top companies
+job_title_distribution <- full_df %>%
+  count(job_title, sort = TRUE) %>%
+  head(10)  # Top 10 job titles
+
+company_distribution <- full_df %>%
+  count(company, sort = TRUE) %>%
+  head(10)  # Top 10 companies
+
+print("Top 10 Job Titles by Frequency:")
+print(job_title_distribution)
+
+print("Top 10 Companies by Frequency:")
+print(company_distribution)
+
+# Step 5: Count of skills per job
+skill_counts_per_job <- full_df %>%
+  mutate(num_skills = str_count(skills, ",") + 1) %>%  # Count skills based on commas
+  summarise(mean_skills = mean(num_skills, na.rm = TRUE), 
+            median_skills = median(num_skills, na.rm = TRUE), 
+            max_skills = max(num_skills, na.rm = TRUE))
+
+print("Skill Count Per Job Statistics:")
+print(skill_counts_per_job)
+
+# Step 6: Most Common Skills
+skills_long <- full_df %>%
+  separate_rows(skills, sep = ",") %>%   # Split skills into individual rows
+  mutate(skills = str_trim(skills)) %>%  # Trim spaces around skill names
+  count(skills, sort = TRUE) %>%         # Count the frequency of each skill
+  rename(skill_name = skills) %>%
+  head(10)                               # Top 10 skills by frequency
+
+print("Top 10 Most Common Skills:")
+print(skills_long)
+
+# Step 7: Overview of missing values
+missing_values <- full_df %>%
+  summarise(across(everything(), ~sum(is.na(.))))
+
+print("Missing Values in Each Column:")
+print(missing_values)
 
 
