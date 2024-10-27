@@ -1,10 +1,12 @@
 ---
 title: "Team 5 - Project 3"
 author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
-date: "2024-10-14"
+date: "2024-10-27"
 output: html_document
 ---
-  
+
+## Overview / Introduction
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -22,9 +24,10 @@ library(arrow)
 library(stringr)
 library(digest)
 library(duckdb)
+library(ggplot2)
 ```
 
-## Reading original dataset
+### Reading original dataset
 
 ```{r init-db-connection}
 
@@ -67,8 +70,7 @@ glimpse(full_df)
 
 ```
 
-**Data Tidying**
-
+### Data Tidying
 
 
 ```{r}
@@ -88,7 +90,7 @@ full_df <- full_df %>%
   mutate(across(where(is.character), ~replace_na(., "Unknown")))
 
 # Display the cleaned data frame
-head(full_df)
+head(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
 
 ```
 
@@ -110,7 +112,6 @@ head(skill_counts, 10)  # Show the top 10 skills by frequency
 ```
 
 ```{r}
-library(ggplot2)
 
 # Plot the top 10 skills
 ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = frequency)) +
@@ -125,7 +126,6 @@ ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = f
 
 ```{r}
 
-
 # List of text columns to normalize
 text_columns <- c("job_title", "job_summary", "job_location", "search_position", "company")
 
@@ -134,36 +134,47 @@ full_df <- full_df %>%
   mutate(across(all_of(text_columns), ~ str_trim(tolower(.))))
 
 # Display the first few rows of the updated dataset
-head(full_df)
+head(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
 
 ```
 
-##This is some basic statistics that can be used in the project
-```{r Some-statistics}
+### Data Analysis
+Diving deeper into analysis, we can check to see if the top 10 skills are influenced by the job level. Our data contains two values for the `job_level` field, 'Mid senior' and 'Associate.' We will take the same approach we did for the `skill_counts` data frame and make sure to include `job_level` in our output. Once we create the `skill_by_level` data frame, we will use it to merge two subsets filtered for each job title and combined through the row name. Doing so produces the table seen below.
+```{r skill by level}
 
-library(dplyr)
-library(tidyr)
-library(stringr)
+#Skill frequency by job level
+skill_by_level <- full_df %>%
+  separate_rows(skills, sep = ",") %>%    # Split skills by commas into individual rows
+  rename(skill_name = skills) %>%         # Rename the column to "skill_name"
+  mutate(skill_name = str_trim(skill_name)) %>%  # Remove extra spaces around skill names
+  group_by(skill_name,job_level) %>% 
+  count(job_level, sort = TRUE) %>%      # Count occurrences of each skill and sort by frequency
+  rename(frequency = n)
 
-# Step 1: Load full_df and collect data for in-memory processing
-full_df <- full_df %>%
-  collect()  # If full_df is still lazy, convert it to an in-memory data frame
+#Comparison of top 10 skills based on job level
+job_level_comparison <- merge(
+  skill_by_level %>% 
+    filter(job_level=='Mid senior') %>% 
+    head(10),
+  skill_by_level %>% 
+    filter(job_level=='Associate') %>% 
+    head(10),
+  by='row.names'
+) %>% 
+  arrange(desc(frequency.x)) %>% 
+  rename(top_mid_senior_skill = skill_name.x,
+         top_associate_skill = skill_name.y) %>% 
+  select(2,5)
 
-# Step 2: Basic summary statistics for numeric columns
-numeric_summary <- full_df %>%
-  summarise(across(where(is.numeric), list(mean = mean, sd = sd, min = min, max = max), na.rm = TRUE))
+print("Top 10 Skills by Job Level:")
+job_level_comparison
 
-print("Numeric Summary:")
-print(numeric_summary)
+```
 
-# Step 3: Counts of unique values in each character column
-unique_counts <- full_df %>%
-  summarise(across(where(is.character), ~n_distinct(.)))
+The above data frame illustrates the slight differences in skills that exist between 'Mid senior' and 'Associate' level positions. Below, are a few more interesting statistics regarding the job titles, companies, and regions within our data set. The first one tabulates the top job titles within our data set which seems to be filled by mostly 'Mid senior,' engineer and analytics positions. The next one gives a glimpse into which companies have the most amount of job postings. Interestingly enough, a bit of research comes to show that the majority of these are recruiting companies. Last, but not least, we have a distribution of the regions with the most job postings. Out of the 10 listed, the majority of them fall on the east coast United Sates, save California, Texas, the UK, and Illinois.
+```{r other distributions}
 
-print("Unique Counts in Character Columns:")
-print(unique_counts)
-
-# Step 4: Distribution of job titles and top companies
+#Distribution of top job titles, companies, and regions
 job_title_distribution <- full_df %>%
   count(job_title, sort = TRUE) %>%
   head(10)  # Top 10 job titles
@@ -172,38 +183,20 @@ company_distribution <- full_df %>%
   count(company, sort = TRUE) %>%
   head(10)  # Top 10 companies
 
+regional_distribution <- full_df %>%
+  mutate(region=str_replace(job_location,'(.*?),(.*?)', '\\2')) %>% 
+  count(region, sort = TRUE) %>%
+  head(10)  # Top 10 regions
+
 print("Top 10 Job Titles by Frequency:")
 print(job_title_distribution)
 
 print("Top 10 Companies by Frequency:")
 print(company_distribution)
 
-# Step 5: Count of skills per job
-skill_counts_per_job <- full_df %>%
-  mutate(num_skills = str_count(skills, ",") + 1) %>%  # Count skills based on commas
-  summarise(mean_skills = mean(num_skills, na.rm = TRUE), 
-            median_skills = median(num_skills, na.rm = TRUE), 
-            max_skills = max(num_skills, na.rm = TRUE))
-
-print("Skill Count Per Job Statistics:")
-print(skill_counts_per_job)
-
-# Step 6: Most Common Skills
-skills_long <- full_df %>%
-  separate_rows(skills, sep = ",") %>%   # Split skills into individual rows
-  mutate(skills = str_trim(skills)) %>%  # Trim spaces around skill names
-  count(skills, sort = TRUE) %>%         # Count the frequency of each skill
-  rename(skill_name = skills) %>%
-  head(10)                               # Top 10 skills by frequency
-
-print("Top 10 Most Common Skills:")
-print(skills_long)
-
-# Step 7: Overview of missing values
-missing_values <- full_df %>%
-  summarise(across(everything(), ~sum(is.na(.))))
-
-print("Missing Values in Each Column:")
-print(missing_values)
+print("Top 10 Regions by Frequency:")
+print(regional_distribution)
 
 ```
+
+## Conclusions / Findings and Recommendations
