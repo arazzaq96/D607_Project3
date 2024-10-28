@@ -1,6 +1,6 @@
 ---
 title: "D607-Project3-scraper"
-author: "Marco Castro"
+author: "Ariba Mandavia, Jose Fuentes, Marco Castro, Steven Gonzalez"
 date: "2024-10-25"
 output: html_document
 ---
@@ -169,4 +169,4 @@ write.csv(all_jobs, "datasets/uk-jobs.csv", row.names=FALSE)
 ```
 
 ## Next Steps
-As next steps, we could follow the[ERD](https://miro.com/app/board/uXjVLPb_3f0=/) from our Indeed database to normalize this dataset. This would allow us to merge the two datasets to aggregrate the information accross the two datasets and/or compare differences between US and UK-based top Data Science skills sought by companies this year. Ideally though, this dataset would match the same time-period of our original "control" dataset.
+As next steps, we could follow the[ERD](https://miro.com/app/board/uXjVLPb_3f0=/) from our Indeed database to normalize this dataset. This would allow us to merge the two datasets to aggregrate the information accross the two datasets and/or compare differences between US and UK-based top Data Science skills sought by companies this year. Ideally though, this dataset would match the same time-period of our original "control" dataset. Additionally, this dataset needs heavy cleaning and tidying.
