@@ -90,7 +90,7 @@ This section crawls each individual job listing page, grabs the content and expo
 col_names <- c("id", "job_title", "date_posted", "job_desc", "job_location", "job_salary", "job_type", "company", "company_url", "job_skills")
 all_jobs <- data.frame(matrix(ncol=10,nrow=0, dimnames=list(NULL,  col_names)))
 
-for (i in unique(page_ids[1:2])) {
+for (i in unique(page_ids)) {
 
   job_listing_page = read_html(str_c('https://www.reed.co.uk/jobs/data-scientist/',i, sep=""))
   
@@ -166,8 +166,6 @@ Once this job is complete, export the dataframe as a Parquet and CSV file.
 # reset dataframe column names
 colnames(all_jobs) <- col_names
 
-all_jobs_clean <- all_jobs |>
-  mutate(job_skills = str_replace(job_skills, "\\s\\s","") )
 # export files to parquet and csv
 write_parquet(all_jobs, "datasets/uk-jobs.parquet")
 write.csv(all_jobs, "datasets/uk-jobs.csv", row.names=FALSE)
