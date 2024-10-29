@@ -207,10 +207,13 @@ print(regional_distribution)
 
 ```
 
-## Conclusions / Findings and Recommendations
+## Conclusions / Limitations and Recommendations
+
+This project relied on a [pre-assembled webscrape](https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills) of job listings on Indeed for the "Data Science" positions which was compiled in January 2024. It represents a snapshot of common skills that employers were search on a single job listing site at a particular time and may not be fully representative of the overall most important data skills. We would need current data to compare whether the top skills of our work continue to be important today or to data from additional sources to cross-check. 
+
+While we attempted to scrape the Indeed site as part of this work, we ran into some authorization issues that prevented us from recreating a current dataset. However, we were able to scrapte a [dataset](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-scraper.Rmd) from an UK-based jobs engine, which could be used to compare the differences between US and UK tops skills in. future version of this project.
 
 
+---
 
-
-
-<small><sup>*</sup> Our team made an attempt to scrape current data from Indeed, but were unable to replicate the procedure. For demonstrative purposes, we did (scrape data](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-scraper.Rmd) from a UK-based jobs engine, which could be used to compare the differences between the two in a version of this future project</small>
+<small><sup>*</sup> Our team made an attempt to scrape current data from Indeed, but were unable to replicate the procedure. For demonstrative purposes, we were able to (scrape data](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-scraper.Rmd) another source</small>
