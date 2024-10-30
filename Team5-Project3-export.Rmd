@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(dbplyr)
 library(tidyr)
+library(tidyverse)
 library(tibble)
 library(rvest)
 library(rlist)
@@ -37,12 +38,100 @@ We began by normalizing the dataset to match our proposed Entity Relationship Di
 
 We have broken out our normalization process into a separate document in an attempt to only show how we would work directly with an existing relational database within this file. For details on how we normalized the dataset, review  the [Team5-Project3-normalize-and-export-source.Rmd](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-normalize-and-export-source.Rmd) file on the project's Github repo.
 
+
+### Reading the original dataset files
+
+After inspecting the Indeed dataset files, we noticed that while the files did not have an id column, each job listing, job summary, and job skills could be identified by the listings URL (_job_link_ field). Because this field is a bit verbose, we cleaned up this field using a custom function __convert_key__. The __convert_key__ function accepts a dataframe (_df_), then mutates it by dropping the domain name then using the page slug to create a hash using __digest__. This function will be called to create a unique id for each job and will allow us to join tables as necessary.
+
+Next, we imported the  job summary, job listing, and job skills files one at a time and cleaning their corresponding dataframes with the columns that we idenfied in our database schema represented in our [Entity Relationship Diagram](https://miro.com/app/board/uXjVLPb_3f0=/).
+
+```{r read-csvs}
+
+# function to create a primary key column from the url
+convert_key <- function (df) {
+  df |> mutate(
+    job_id = str_extract(job_link, "\\/[^\\/]*$"),
+    job_id = map_chr(job_id, digest, algo = 'md5', seed = 1234)
+  ) |>
+  relocate(job_id)
+}
+
+# read in job summary csv
+orig_job_summary <- read_csv("source_files/job_summary.csv") |>
+  convert_key() |>
+  subset(select = -c(job_link))
+
+# read in job postings csv
+orig_job_postings <- read_csv("source_files/job_postings.csv") |>
+  convert_key()
+
+# subset companies and add col id  
+companies_df <- subset(orig_job_postings, select = c(company)) |>
+  distinct(company) |>
+  mutate(company_id = row_number()) |>
+  relocate(company_id, .before = "company") 
+
+# add job description and subset
+jobs_df <- orig_job_postings |> 
+  left_join(orig_job_summary, join_by(job_id == job_id)) |> # add Job Description
+  subset(select = c(job_id, job_title, job_summary, job_location, search_position, job_level, job_type, company)) |>
+  left_join(companies_df, join_by(company == company)) |>   # add Job Company field
+  subset(select = -c(company))
+
+```
+
+### Creating the Skills and Job_Skills Joining Table
+
+In this section, we create a "skills" dataframe and a joiner "job_skills" dataframe. I start by reading in the job skills, transform the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim_ to break up the _job_skills_ field into separate rows, using a comma deliminator. I will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
+
+To create the "skills" dataframe, I first copy the "job_skills" dataframe, use __distint__ to remove the duplicates, than add a row number to use as the _skill_id_ field. This essentially leaves a table of unique skills with their respective Id.
+
+As a final step, I use __left_join__ to join my "skills" dataframe to the "job_skills" dataframe by the _skill_name_ field. Dropping the _skill_name_ leaves two columns: 
+1. _job_id_ which will serve as a foreign key to join with my "jobs" dataframe or SQL table, and
+2. _skill_id_ which will serve as a foreign key to join with my "skills" table or SQL table
+
+
+```{r create-joiner-table}
+
+# create joiner table
+job_skills_dirty <- read_csv("source_files/job_skills.csv") |>
+  convert_key() |>
+  subset(select = c(job_id, job_skills)) |>
+  rename(skill_name = job_skills)
+
+# create joiner table
+job_skills_distinct <- job_skills_dirty  |>
+  separate_longer_delim(cols = c(skill_name), delim="," )
+
+# make distinct list of unique skills and give them their own id
+skills_distinct <- job_skills_distinct |>
+  distinct(skill_name) |>
+  mutate(skill_id = row_number()) |>
+  relocate(skill_id, .before = skill_name)
+
+# update joiner to bring unique artist idea 
+job_skills_distinct <- job_skills_distinct |>
+  left_join(skills_distinct, join_by(skill_name == skill_name)) |>
+  subset(select=-c(skill_name))
+```
+
+### Export Files
+
+This next section writes the data frames as Parquet files. Since Parquet is binary format, I am also exporting the dataframes to .CSV to be able to examine the outputs. 
+
+```{r export-files}
+# write parquet files
+write_parquet(jobs_df, "datasets/jobs.parquet")
+write_parquet(companies_df, "datasets/companies.parquet")
+write_parquet(skills_distinct, "datasets/skills.parquet")
+write_parquet(job_skills_distinct, "datasets/job_skills.parquet")
+```
+
 ### Reading the Normalized Dataset
 
 We used [DuckDB](https://duckdb.org/), a popular open-source embeddable database to manage our relational database. We chose DuckDB as way to try working with a different type of database within R and for its portability — though we don't recommend storing sensitive data in a public repository as we have for this exercise. 
 
 After loading the __duckdb__ package, we initialized DuckDB by establishing a connection (#A1) and importing our pre-normalized database parquet files (#A2). Next, we used SQL to join the tables into a single dataframe (#A3).
-
 
 ```{r init-db-connection}
 
@@ -55,6 +144,13 @@ for (t in tables) {
   parquet_file <- paste('datasets/',t,'.parquet', sep="")
   duckdb_register(con, t, read_parquet(parquet_file))
 }
+
+# show what we loaded
+glimpse(tbl(con, "jobs"))
+glimpse(tbl(con, "skills"))
+glimpse(tbl(con, "job_skills"))
+glimpse(tbl(con, "companies"))
+
 
 # A3. join the tables with SQL and save as dataframe
 full_df <- dbGetQuery(con,"WITH skills_by_id AS (
@@ -98,7 +194,7 @@ full_df <- full_df %>%
   mutate(across(where(is.character), ~replace_na(., "Unknown")))
 
 # Display the cleaned data frame
-head(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
+glimpse(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
 
 ```
 
@@ -142,7 +238,7 @@ full_df <- full_df %>%
   mutate(across(all_of(text_columns), ~ str_trim(tolower(.))))
 
 # Display the first few rows of the updated dataset
-head(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
+glimpse(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
 
 ```
 
