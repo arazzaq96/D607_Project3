@@ -39,7 +39,7 @@ We began by normalizing the dataset to match our proposed Entity Relationship Di
 We have broken out our normalization process into a separate document in an attempt to only show how we would work directly with an existing relational database within this file. For details on how we normalized the dataset, review  the [Team5-Project3-normalize-and-export-source.Rmd](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-normalize-and-export-source.Rmd) file on the project's Github repo.
 
 
-### Reading the original dataset files
+### Normalizing the Original Dataset 
 
 After inspecting the Indeed dataset files, we noticed that while the files did not have an id column, each job listing, job summary, and job skills could be identified by the listings URL (_job_link_ field). Because this field is a bit verbose, we cleaned up this field using a custom function __convert_key__. The __convert_key__ function accepts a dataframe (_df_), then mutates it by dropping the domain name then using the page slug to create a hash using __digest__. This function will be called to create a unique id for each job and will allow us to join tables as necessary.
 
