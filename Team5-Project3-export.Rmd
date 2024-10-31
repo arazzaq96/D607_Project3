@@ -175,7 +175,23 @@ glimpse(full_df)
 ```
 
 ### Data Tidying
-
+In this section, we did the following:
+1. Converts all column names to lowercase, which helps standardize them for easier reference.
+2.  Replace spaces with underscores in column names, 
+3. Removes duplicate rows, retaining unique ones. This step is crucial in ensuring your analysis is not skewed by repeated entries.
+4. Replace any NA values in character columns with the string "Unknown." This ensures that missing data does not cause issues later and makes the dataset more informative.
+5. Provides a compact overview of the dataset. Compared to head(), glimpse() is more suitable in larger datasets as it shows the structure of the data.
+6. Split the values in the skills column into individual rows using a comma as a separator. This allows you to analyze individual skills separately.
+7. Rename the skills column to skill_name for clarity.
+8. Remove any extra spaces around skill names.
+9. Count each skill's occurrences and sort them in descending order by frequency.
+10. Rename the count column to frequency for better readability.
+11. Displays the top 10 skills by their frequency. This helps in quickly understanding the most common skills required in the dataset.
+12. Create a bar plot of the top 10 skills.
+13. Reorder the skills based on their frequency in descending order.
+14. Create a bar chart.
+15. Specifies the text columns that need normalization.
+16. Convert all values in the specified text columns to lowercase and trim any extra spaces. This helps in ensuring consistent data formatting.
 
 ```{r}
 
