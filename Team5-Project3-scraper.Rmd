@@ -131,7 +131,8 @@ for (i in unique(page_ids)) {
   job_location <- get_listing_el('//span[@data-qa="localityLbl"]') 
 
   # get the job_type
-  job_type <- get_listing_el('//span[@data-qa="jobTypeLbl"]') 
+  job_type <- get_listing_el('//span[@data-qa="jobTypeLbl"]') |> 
+    str_replace_all("\\s([\\s])+","") 
 
   # get the company name
   company <- job_listing_page |>
@@ -146,20 +147,22 @@ for (i in unique(page_ids)) {
     html_attr("content")
   
    
-  # Let's get the skilss
-  job_skills <- get_listing_el('//ul[@class="list-unstyled skills-list"]') 
+  # get the skillls
+  job_skills <- get_listing_el('//ul[@class="list-unstyled skills-list"]') |> 
+    str_replace_all("\\s([\\s])+",",")
   
   # create a temporary row vector
   temp <- c(i, job_title, date_posted, job_desc, job_location, job_salary, job_type, company, company_url, job_skills)
   
   # append row to all_jobs dataframe 
-  all_jobs <- rbind(temp, all_jobs)
+  all_jobs <- rbind(temp, all_jobs) 
 }
 ```
 
 Once this job is complete, export the dataframe as a Parquet and CSV file. 
 
 ``` {r export-df}
+
 # reset dataframe column names
 colnames(all_jobs) <- col_names
 
