@@ -26,6 +26,7 @@ library(stringr)
 library(digest)
 library(duckdb)
 library(ggplot2)
+library(gt)
 ```
 
 ## Overview 
@@ -36,12 +37,9 @@ We began by normalizing the dataset to match our proposed Entity Relationship Di
 
 ![Entity Relationship Diagram](ERD.png). 
 
-We have broken out our normalization process into a separate document in an attempt to only show how we would work directly with an existing relational database within this file. For details on how we normalized the dataset, review  the [Team5-Project3-normalize-and-export-source.Rmd](https://github.com/mcastro64/D607_Project3/blob/bcdc0748160cd2e9abca7ece7aff03f774bfda12/Team5-Project3-normalize-and-export-source.Rmd) file on the project's Github repo.
-
-
 ### Normalizing the Original Dataset 
 
-After inspecting the Indeed dataset files, we noticed that while the files did not have an id column, each job listing, job summary, and job skills could be identified by the listings URL (_job_link_ field). Because this field is a bit verbose, we cleaned up this field using a custom function __convert_key__. The __convert_key__ function accepts a dataframe (_df_), then mutates it by dropping the domain name then using the page slug to create a hash using __digest__. This function will be called to create a unique id for each job and will allow us to join tables as necessary.
+After inspecting the Indeed dataset files, we noticed that while the files did not have an id column, each job listing, job summary, and job skills could be identified by the listings URL (_job_link_ field). Because this field is a bit verbose, we decided to create a new id for the job listings but retain the existing unique relationships by deriving the id from the link. While originally we thought to use the 10-digit sequence at the end of the slug, we realized there 23 instances where the sequence was repeated for related but distinct jobs at the same company. We decided to create a custom function that we can call when preparing each of the dataframes that drops the domain name and using the page slug to create a hash using __digest__. 
 
 Next, we imported the  job summary, job listing, and job skills files one at a time and cleaning their corresponding dataframes with the columns that we idenfied in our database schema represented in our [Entity Relationship Diagram](https://miro.com/app/board/uXjVLPb_3f0=/).
 
@@ -82,11 +80,11 @@ jobs_df <- orig_job_postings |>
 
 ### Creating the Skills and Job_Skills Joining Table
 
-In this section, we create a "skills" dataframe and a joiner "job_skills" dataframe. I start by reading in the job skills, transform the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim_ to break up the _job_skills_ field into separate rows, using a comma deliminator. I will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
+Next, we created a "skills" dataframe and a joiner "job_skills" dataframe. We start by reading in the job skills, transform the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim_ to break up the _job_skills_ field into separate rows, using a comma deliminator. We will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
 
-To create the "skills" dataframe, I first copy the "job_skills" dataframe, use __distint__ to remove the duplicates, than add a row number to use as the _skill_id_ field. This essentially leaves a table of unique skills with their respective Id.
+To create the "skills" dataframe, we first copy the "job_skills" dataframe, use __distint__ to remove the duplicates, than add a row number to use as the _skill_id_ field. This essentially leaves a table of unique skills with their respective Id.
 
-As a final step, I use __left_join__ to join my "skills" dataframe to the "job_skills" dataframe by the _skill_name_ field. Dropping the _skill_name_ leaves two columns: 
+As a final step, we use __left_join__ to join the "skills" dataframe to the "job_skills" dataframe by the _skill_name_ field. Dropping the _skill_name_ leaves two columns: 
 1. _job_id_ which will serve as a foreign key to join with my "jobs" dataframe or SQL table, and
 2. _skill_id_ which will serve as a foreign key to join with my "skills" table or SQL table
 
@@ -175,35 +173,36 @@ glimpse(full_df)
 ```
 
 ### Data Tidying
-
+With our dataframe loaded, we moved on to cleaning and tidying the data. First, we standardized the column mames by lowercasing and replacing spaces with "_" to convert them to snake format. We removed leftover any duplicates using the _distinct_ function. Finally, we replaced any NA values with "Unknown".
 
 ```{r}
 
-# 1. Standardize Column Names
+# B1. Standardize Column Names
 full_df <- full_df %>%
   rename_all(~str_to_lower(.)) %>%    # Convert all column names to lowercase
   rename_all(~str_replace_all(., " ", "_")) # Replace spaces with underscores
 
-# 2. Remove Duplicates
+# B2. Remove Duplicates
 full_df <- full_df %>%
   distinct()  # Keep only unique rows
 
-# 3. Handle Missing Values
+# B3. Handle Missing Values
 # Replace NA values with 'Unknown' in character columns
 full_df <- full_df %>%
   mutate(across(where(is.character), ~replace_na(., "Unknown")))
 
 # Display the cleaned data frame
-glimpse(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
+glimpse(full_df) 
 
 ```
 
+Our dataframe had multiple skills in a single column. We used _separate_row_ to put each of these observations onto their own rows. We removed the white space around them and used _count_ to create a column showing the number of times (frequency) each skill was mentioned.
 
 ```{r}
 
 # Assuming 'full_df' contains job postings and skill information
 
-# 1. Separate the skills column back into individual rows, renaming it to "skill_name":
+# C1. Separate the skills column back into individual rows, renaming it to "skill_name":
 skill_counts <- full_df %>%
   separate_rows(skills, sep = ",") %>%    # Split skills by commas into individual rows
   rename(skill_name = skills) %>%         # Rename the column to "skill_name"
@@ -211,13 +210,17 @@ skill_counts <- full_df %>%
   count(skill_name, sort = TRUE) %>%      # Count occurrences of each skill and sort by frequency
   rename(frequency = n)                   # Rename count column to 'frequency'
 
-# 2. Display the top skills
+# C2. Display the top skills
 head(skill_counts, 10)  # Show the top 10 skills by frequency
 ```
 
+# Plot the top 10 skills
+
+We used our frequencies table to create a  plot showing the top 10 skills.
+
 ```{r}
 
-# Plot the top 10 skills
+
 ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = frequency)) +
   geom_bar(stat = "identity") +
   labs(title = "Top 10 Skills in Data Science Job Postings",
@@ -228,22 +231,9 @@ ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = f
 
 ```
 
-```{r}
-
-# List of text columns to normalize
-text_columns <- c("job_title", "job_summary", "job_location", "search_position", "company")
-
-# Apply normalization to each text column
-full_df <- full_df %>%
-  mutate(across(all_of(text_columns), ~ str_trim(tolower(.))))
-
-# Display the first few rows of the updated dataset
-glimpse(full_df) #the head() command produces a huge output in the HTML, what do you think about using glimpse()
-
-```
-
 ### Data Analysis
 Diving deeper into analysis, we can check to see if the top 10 skills are influenced by the job level. Our data contains two values for the `job_level` field, 'Mid senior' and 'Associate.' We will take the same approach we did for the `skill_counts` data frame and make sure to include `job_level` in our output. Once we create the `skill_by_level` data frame, we will use it to merge two subsets filtered for each job title and combined through the row name. Doing so produces the table seen below.
+
 ```{r skill by level}
 
 #Skill frequency by job level
