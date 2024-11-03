@@ -5,8 +5,6 @@ date: "2024-10-27"
 output: html_document
 ---
 
-## Overview / Introduction
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -27,6 +25,7 @@ library(digest)
 library(duckdb)
 library(ggplot2)
 library(gt)
+library(patchwork)
 ```
 
 ## Overview 
@@ -35,7 +34,9 @@ For Project 3, our team was asked to answer the question, _Which are the most va
 
 We began by normalizing the dataset to match our proposed Entity Relationship Diagram (ERD) shown below:
 
+<center>
 ![Entity Relationship Diagram](ERD.png). 
+</center>
 
 ### Normalizing the Original Dataset 
 
@@ -43,7 +44,7 @@ After inspecting the Indeed dataset files, we noticed that while the files did n
 
 Next, we imported the job summary, job listing, and job skills files one at a time and transfomed them to match our [Entity Relationship Diagram](https://miro.com/app/board/uXjVLPb_3f0=/).
 
-```{r read-csvs}
+```{r read-csvs, message=FALSE}
 
 # function to create a primary key column from the url
 convert_key <- function (df) {
@@ -88,8 +89,7 @@ As a final step, we use __left_join__ to join the "skills" dataframe to the "job
 1. _job_id_ which will serve as a foreign key to join with my "jobs" dataframe or SQL table, and
 2. _skill_id_ which will serve as a foreign key to join with my "skills" table or SQL table
 
-
-```{r create-joiner-table}
+```{r create-joiner-table, message=FALSE}
 
 # create joiner table
 job_skills_dirty <- read_csv("source_files/job_skills.csv") |>
@@ -173,6 +173,7 @@ glimpse(full_df)
 ```
 
 ### Data Tidying
+
 With our dataframe loaded, we moved on to cleaning and tidying the data. First, we standardized the column mames by lowercasing and replacing spaces with "_" to convert them to snake format. We removed leftover any duplicates using the _distinct_ function. Finally, we replaced any NA values with "Unknown".
 
 ```{r}
@@ -214,15 +215,15 @@ skill_counts <- full_df %>%
 head(skill_counts, 10)  # Show the top 10 skills by frequency
 ```
 
-# Plot the top 10 skills
+### Plot the top 10 skills
 
-We used our frequencies table to create a  plot showing the top 10 skills.
+We used our frequencies table to create a plot showing the top 10 skills.
 
-```{r}
+```{r fig.align='center'}
 
-
-ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = frequency)) +
-  geom_bar(stat = "identity") +
+ggplot(skill_counts %>% head(10),
+       aes(x = reorder(skill_name, -frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill = 'green') +
   labs(title = "Top 10 Skills in Data Science Job Postings",
        x = "Skill",
        y = "Frequency") +
@@ -232,17 +233,18 @@ ggplot(skill_counts %>% head(10), aes(x = reorder(skill_name, -frequency), y = f
 ```
 
 ### Data Analysis
+
 Diving deeper into analysis, we can check to see if the top 10 skills are influenced by the job level. Our data contains two values for the `job_level` field, 'Mid senior' and 'Associate.' We will take the same approach we did for the `skill_counts` data frame and make sure to include `job_level` in our output. Once we create the `skill_by_level` data frame, we will use it to merge two subsets filtered for each job title and combined through the row name. Doing so produces the table seen below.
 
 ```{r skill by level}
 
 #Skill frequency by job level
 skill_by_level <- full_df %>%
-  separate_rows(skills, sep = ",") %>%    # Split skills by commas into individual rows
-  rename(skill_name = skills) %>%         # Rename the column to "skill_name"
-  mutate(skill_name = str_trim(skill_name)) %>%  # Remove extra spaces around skill names
+  separate_rows(skills, sep = ",") %>%
+  rename(skill_name = skills) %>%
+  mutate(skill_name = str_trim(skill_name)) %>%
   group_by(skill_name,job_level) %>% 
-  count(job_level, sort = TRUE) %>%      # Count occurrences of each skill and sort by frequency
+  count(job_level, sort = TRUE) %>%
   rename(frequency = n)
 
 #Comparison of top 10 skills based on job level
@@ -260,36 +262,97 @@ job_level_comparison <- merge(
          top_associate_skill = skill_name.y) %>% 
   select(2,5)
 
-print("Top 10 Skills by Job Level:")
 job_level_comparison
 
 ```
 
-The above data frame illustrates the slight differences in skills that exist between 'Mid senior' and 'Associate' level positions. Below, are a few more interesting statistics regarding the job titles, companies, and regions within our data set. The first one tabulates the top job titles within our data set which seems to be filled by mostly 'Mid senior,' engineer and analytics positions. The next one gives a glimpse into which companies have the most amount of job postings. Interestingly enough, a bit of research comes to show that the majority of these are recruiting companies. Last, but not least, we have a distribution of the regions with the most job postings. Out of the 10 listed, the majority of them fall on the east coast United Sates, save California, Texas, the UK, and Illinois.
+```{r level plot, fig.align='center'}
+
+mid_senior_plot <- ggplot(skill_by_level %>% 
+    filter(job_level=='Mid senior') %>% 
+    head(10), aes(x = reorder(skill_name, frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill = 'purple') +
+  labs(title = "Top 10 Skills in Data Science Job Postings by Job Level",
+       x = "Mid Senior Skill",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip() +
+  scale_y_reverse()
+
+associate_plot <- ggplot(skill_by_level %>% 
+    filter(job_level=='Associate') %>% 
+    head(10), aes(x = reorder(skill_name, frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill = 'blue') +
+  labs(x = "Associate Skill",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()
+
+mid_senior_plot + associate_plot
+
+```
+
+The above data frame and plot illustrate the slight differences in skills that exist between 'Mid senior' and 'Associate' level positions. Below, are a few more interesting statistics regarding the job titles, companies, and regions within our data set. The first one tabulates the top job titles within our data set which seems to be filled by mostly 'Mid senior,' engineer and analytics positions. The next one gives a glimpse into which companies have the most amount of job postings. Interestingly enough, a bit of research comes to show that the majority of these are recruiting companies. Last, but not least, we have a distribution of the regions with the most job postings. Out of the 10 listed, the majority of them fall on the east coast United Sates, save California, Texas, the UK, and Illinois.
+
 ```{r other distributions}
 
 #Distribution of top job titles, companies, and regions
 job_title_distribution <- full_df %>%
   count(job_title, sort = TRUE) %>%
-  head(10)  # Top 10 job titles
+  head(10) %>% # Top 10 job titles
+  rename(frequency = n)
 
 company_distribution <- full_df %>%
   count(company, sort = TRUE) %>%
-  head(10)  # Top 10 companies
+  head(10) %>%   # Top 10 companies
+  rename(frequency = n)
 
 regional_distribution <- full_df %>%
   mutate(region=str_replace(job_location,'(.*?),(.*?)', '\\2')) %>% 
   count(region, sort = TRUE) %>%
-  head(10)  # Top 10 regions
+  head(10) %>%   # Top 10 regions
+  rename(frequency = n)
 
-print("Top 10 Job Titles by Frequency:")
-print(job_title_distribution)
+job_title_distribution
+company_distribution
+regional_distribution
 
-print("Top 10 Companies by Frequency:")
-print(company_distribution)
+```
 
-print("Top 10 Regions by Frequency:")
-print(regional_distribution)
+```{r other plots, fig.align='center', warning=FALSE}
+
+# Plots
+job_plot <- ggplot(job_title_distribution,
+                   aes(x = reorder(job_title, -frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill='red') +
+  labs(title = "Top 10 Job Titles, Companies, and Regions in Data Science Job Postings",
+       x = "Job Title",
+       y = "Frequency") +
+  guides(fill = FALSE) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+company_plot <- ggplot(company_distribution,
+                       aes(x = reorder(company, -frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill='orange') +
+  labs(x = "Company",
+       y = "") +
+  guides(fill = FALSE) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+region_plot <- ggplot(regional_distribution,
+                      aes(x = reorder(region, -frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill='yellow') +
+  labs(x = "Region",
+       y = "") +
+  guides(fill = FALSE) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+job_plot + company_plot + region_plot
 
 ```
 
