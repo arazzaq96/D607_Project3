@@ -271,8 +271,7 @@ mid_senior_plot <- ggplot(skill_by_level %>%
        y = "Frequency") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  coord_flip() +
-  scale_y_reverse()
+  coord_flip()
 
 associate_plot <- ggplot(skill_by_level %>% 
     filter(job_level=='Associate') %>% 
