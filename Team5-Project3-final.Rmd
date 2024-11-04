@@ -81,7 +81,7 @@ jobs_df <- orig_job_postings |>
 
 ### Creating the Skills and Job_Skills Joining Table
 
-To create a "skills" dataframe and a joiner "job_skills" dataframes, we read in the job skills, transformed the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim_ to break up the _job_skills_ field into separate rows, using a comma deliminator. We will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
+To create a "skills" dataframe and a joiner "job_skills" dataframes, we read in the job skills, transformed the url field into a hash to use as the foreign key to connect with the job record, subset with just the fields _job_id_ and _job_skills_, and used __separate_longer_delim__ to break up the _job_skills_ field into separate rows, using a comma deliminator. We will need to update this dataframe later to replace each skill listed in the _skill_name_ column with its unique id. 
 
 To create the "skills" dataframe, we first copy the "job_skills" dataframe, use __distint__ to remove the duplicates, than add a row number to use as the _skill_id_ field. This essentially leaves a table of unique skills with their respective Id.
 
@@ -111,13 +111,7 @@ skills_distinct <- job_skills_distinct |>
 job_skills_distinct <- job_skills_distinct |>
   left_join(skills_distinct, join_by(skill_name == skill_name)) |>
   subset(select=-c(skill_name))
-```
 
-### Export Files
-
-This next section writes the data frames as Parquet files. Since Parquet is binary format, I am also exporting the dataframes to .CSV to be able to examine the outputs. 
-
-```{r export-files}
 # write parquet files
 write_parquet(jobs_df, "datasets/jobs.parquet")
 write_parquet(companies_df, "datasets/companies.parquet")
@@ -125,7 +119,7 @@ write_parquet(skills_distinct, "datasets/skills.parquet")
 write_parquet(job_skills_distinct, "datasets/job_skills.parquet")
 ```
 
-### Reading the Normalized Dataset
+### Reading the Normalized Dataset As a Relational Database
 
 We used [DuckDB](https://duckdb.org/), a popular open-source embeddable database to manage our relational database. We chose DuckDB as way to try working with a different type of database within R and for its portability — though we don't recommend storing sensitive data in a public repository as we have for this exercise. 
 
